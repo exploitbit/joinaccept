@@ -36,9 +36,10 @@ function getState(userId) {
   return userState.get(userId);
 }
 
-// Admin check
+// Admin check middleware
 bot.use((ctx, next) => {
   if (ctx.from && ctx.from.id === ADMIN_ID) return next();
+  // Optionally ignore non-admin
 });
 
 bot.start(async (ctx) => {
@@ -64,7 +65,7 @@ bot.on('text', async (ctx) => {
       state.client = client;
 
       await ctx.reply('Connecting to Telegram...');
-      await client.connect(); // <-- IMPORTANT: connect before sending code
+      await client.connect();
 
       await ctx.reply('Sending OTP...');
       const sendCodeResult = await client.sendCode(
@@ -93,7 +94,7 @@ bot.on('text', async (ctx) => {
       } catch (error) {
         if (error.errorMessage === 'SESSION_PASSWORD_NEEDED') {
           state.step = 'awaiting_2fa';
-          await ctx.reply('2FA enabled. Enter your password:');
+          await ctx.reply('Two‑factor authentication is enabled. Please enter your password:');
           return;
         }
         throw error;
@@ -170,13 +171,14 @@ async function startApprovalForUser(userId, ctx) {
   const client = state.client;
   const channelId = state.channelId;
 
+  // Backfill old requests
   (async () => {
     try {
-      await ctx.reply('🔄 Fetching pending requests...');
+      await ctx.reply('🔄 Fetching all pending join requests...');
       let count = 0, errors = 0;
       const chat = await client.getEntity(channelId);
 
-      const requestsIter = client.getChatJoinRequests(channelId, { limit: 100 });
+      const requestsIter = client.iterChatJoinRequests(channelId, { limit: 100 });
 
       for await (const req of requestsIter) {
         try {
@@ -187,12 +189,14 @@ async function startApprovalForUser(userId, ctx) {
             })
           );
           count++;
-          if (count % 10 === 0) console.log(`Approved ${count}`);
+          if (count % 10 === 0) {
+            console.log(`Approved ${count} users...`);
+          }
           await new Promise(resolve => setTimeout(resolve, 200));
         } catch (e) {
           if (e.errorMessage === 'FLOOD_WAIT') {
             const seconds = e.seconds || 5;
-            console.log(`Flood wait ${seconds}s`);
+            console.log(`Flood wait, sleeping ${seconds}s`);
             await new Promise(resolve => setTimeout(resolve, seconds * 1000));
             try {
               await client.invoke(
@@ -202,7 +206,9 @@ async function startApprovalForUser(userId, ctx) {
                 })
               );
               count++;
-            } catch { errors++; }
+            } catch {
+              errors++;
+            }
           } else {
             errors++;
           }
@@ -218,7 +224,7 @@ async function startApprovalForUser(userId, ctx) {
     }
   })();
 
-  // Real-time handler
+  // Real-time handler for new requests
   client.addEventHandler(async (update) => {
     if (update instanceof Api.UpdateBotChatInviteRequester) {
       if (update.peer.channelId && update.peer.channelId.toString() === channelId.toString()) {
@@ -239,6 +245,35 @@ async function startApprovalForUser(userId, ctx) {
   });
 }
 
-bot.launch().then(() => console.log('Bot started')).catch(console.error);
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// Graceful shutdown
+async function shutdown(signal) {
+  console.log(`Received ${signal}, shutting down gracefully...`);
+  try {
+    await bot.stop();
+  } catch (err) {
+    console.error('Error stopping bot:', err);
+  }
+  // Also disconnect any Telegram clients
+  for (const [userId, state] of userState.entries()) {
+    if (state.client && state.client.connected) {
+      try {
+        await state.client.disconnect();
+        console.log(`Disconnected client for user ${userId}`);
+      } catch (err) {
+        console.error(`Error disconnecting client for user ${userId}:`, err);
+      }
+    }
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Launch bot with error handling
+bot.launch().then(() => {
+  console.log('Bot started successfully');
+}).catch(err => {
+  console.error('Failed to start bot:', err);
+  process.exit(1);
+});
