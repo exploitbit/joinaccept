@@ -22,7 +22,7 @@ API_ID = 33277483  # Your API ID
 API_HASH = "65b9f007d9d208b99519c52ce89d3a2a"  # Your API Hash
 
 # Your user account phone number (with country code)
-PHONE_NUMBER = "+1234567890"  # Replace with your phone number
+PHONE_NUMBER = "+918002591484"  # Replace with your phone number
 
 # Admin ID for notifications (your own user ID)
 ADMIN_ID = 8469993808
