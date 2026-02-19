@@ -5,7 +5,7 @@ import os
 from pyrogram import Client, idle, filters
 from pyrogram.types import ChatJoinRequest, Message
 from pyrogram.errors import FloodWait, UserAlreadyParticipant
-from pyrogram.storage import MongoStorage
+from pyrogram.handlers import ChatJoinRequestHandler, MessageHandler
 
 # Configure Logging
 logging.basicConfig(
@@ -18,11 +18,9 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION from Environment Variables ---
 API_ID = int(os.environ.get("API_ID", 0))
 API_HASH = os.environ.get("API_HASH", "")
-PHONE_NUMBER = os.environ.get("PHONE_NUMBER", "")   # e.g., "+918002591484"
+SESSION_STRING = os.environ.get("SESSION_STRING", "")  # Generated once locally
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", 0))   # e.g., -1003784917581
-MONGO_URI = os.environ.get("MONGO_URI", "")         # Your MongoDB connection string
-SESSION_NAME = os.environ.get("SESSION_NAME", "user_approver")  # Session name in MongoDB
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", 0))      # e.g., -1003784917581
 
 # Validate required variables
 missing = []
@@ -30,20 +28,18 @@ if not API_ID:
     missing.append("API_ID")
 if not API_HASH:
     missing.append("API_HASH")
-if not PHONE_NUMBER:
-    missing.append("PHONE_NUMBER")
+if not SESSION_STRING:
+    missing.append("SESSION_STRING (generate it first!)")
 if not ADMIN_ID:
     missing.append("ADMIN_ID")
 if not CHANNEL_ID:
     missing.append("CHANNEL_ID")
-if not MONGO_URI:
-    missing.append("MONGO_URI")
 
 if missing:
     logger.error(f"❌ Missing required environment variables: {', '.join(missing)}")
     sys.exit(1)
 
-# Global variables (will be set after client starts)
+# Global variables
 CHANNEL_INFO = None
 approval_count = 0
 
@@ -262,17 +258,12 @@ async def verify_user_admin(client: Client, channel_id: int) -> bool:
 # Main Entry Point
 # ---------------------------------------------------------
 async def main():
-    # Create client with MongoDB storage
-    storage = MongoStorage(
-        name=SESSION_NAME,
-        uri=MONGO_URI,
-        database="telegramacceptold"   # Database name from your URI
-    )
+    # Create client using session string (no filesystem needed)
     client = Client(
-        storage,
+        name="user_approver",
+        session_string=SESSION_STRING,
         api_id=API_ID,
-        api_hash=API_HASH,
-        phone_number=PHONE_NUMBER
+        api_hash=API_HASH
     )
 
     # Register handlers
@@ -282,7 +273,7 @@ async def main():
 
     try:
         await client.start()
-        logger.info("🚀 User client started successfully with MongoDB storage!")
+        logger.info("🚀 User client started successfully with session string!")
 
         # Verify admin access
         if not await verify_user_admin(client, CHANNEL_ID):
@@ -293,7 +284,7 @@ async def main():
         # Send startup message
         await client.send_message(
             ADMIN_ID,
-            "🚀 **User Approver Started on Railway with MongoDB!**\n\n"
+            "🚀 **User Approver Started on Railway!**\n\n"
             f"📢 Monitoring channel: {CHANNEL_INFO.title}\n\n"
             "**Commands:**\n"
             "• `/start` - Approve ALL pending requests\n"
