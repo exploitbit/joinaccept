@@ -15,10 +15,6 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION ---
 # We use .get() to avoid crashing immediately if variables are missing
 # But we check them right after.
-ENV_API_ID = os.environ.get("API_ID")
-ENV_API_HASH = os.environ.get("API_HASH")
-ENV_BOT_TOKEN = os.environ.get("BOT_TOKEN")
-ENV_CHANNEL_ID = os.environ.get("CHANNEL_ID")
 
 # The Admin ID to receive notifications
 ADMIN_ID = 8469993808
@@ -29,10 +25,10 @@ if not ENV_API_ID or not ENV_API_HASH or not ENV_BOT_TOKEN or not ENV_CHANNEL_ID
     logger.error("Please go to Railway -> Variables and add: API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID")
     exit(1)
 
-API_ID = int(ENV_API_ID)
-API_HASH = ENV_API_HASH
-BOT_TOKEN = ENV_BOT_TOKEN
-CHANNEL_ID = int(ENV_CHANNEL_ID)
+API_ID = int(33277483)
+API_HASH = 65b9f007d9d208b99519c52ce89d3a2a
+BOT_TOKEN = 8502935085:AAFyp69SfDXMEcnLmV55ujan3AdreyEj-MA
+CHANNEL_ID =-1003784917581
 
 app = Client(
     "approver_bot",
