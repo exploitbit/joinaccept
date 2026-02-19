@@ -1,4 +1,3 @@
-import os
 import asyncio
 import logging
 from pyrogram import Client, idle, filters
@@ -12,23 +11,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- CONFIGURATION ---
-# We use .get() to avoid crashing immediately if variables are missing
-# But we check them right after.
+# --- CONFIGURATION (Hardcoded) ---
+# ⚠️ WARNING: Never share this file publicly if it contains these real secrets.
+API_ID = 33277483
+API_HASH = "65b9f007d9d208b99519c52ce89d3a2a"
+BOT_TOKEN = "8502935085:AAFyp69SfDXMEcnLmV55ujan3AdreyEj-MA"
+CHANNEL_ID = -1003784917581
 
-# The Admin ID to receive notifications
+# Admin ID for notifications
 ADMIN_ID = 8469993808
-
-# Check if variables exist before starting
-if not ENV_API_ID or not ENV_API_HASH or not ENV_BOT_TOKEN or not ENV_CHANNEL_ID:
-    logger.error("❌ CRITICAL ERROR: Missing Environment Variables!")
-    logger.error("Please go to Railway -> Variables and add: API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID")
-    exit(1)
-
-API_ID = int(33277483)
-API_HASH = 65b9f007d9d208b99519c52ce89d3a2a
-BOT_TOKEN = 8502935085:AAFyp69SfDXMEcnLmV55ujan3AdreyEj-MA
-CHANNEL_ID =-1003784917581
 
 app = Client(
     "approver_bot",
@@ -51,6 +42,7 @@ async def process_backlog():
 
     count = 0
     
+    # Iterate through ALL pending requests
     async for request in app.get_chat_join_requests(CHANNEL_ID):
         try:
             await app.approve_chat_join_request(
@@ -59,8 +51,7 @@ async def process_backlog():
             )
             count += 1
             
-            # NOTIFICATION LOGIC FOR BACKLOG:
-            # We send a summary every 50 users to avoid spamming the admin 10,000 times.
+            # Send a progress update to Admin every 50 users (to avoid spamming you)
             if count % 50 == 0:
                 msg = f"✅ Backfill Update: Approved {count} users so far..."
                 logger.info(msg)
@@ -69,12 +60,13 @@ async def process_backlog():
                 except:
                     pass
             
+            # Tiny sleep to prevent FloodWait errors
             await asyncio.sleep(0.1)
 
         except FloodWait as e:
             logger.warning(f"⚠️ Rate Limit! Sleeping for {e.value} seconds.")
             await asyncio.sleep(e.value)
-            # Retry once
+            # Retry once after sleeping
             try:
                 await app.approve_chat_join_request(chat_id=CHANNEL_ID, user_id=request.user.id)
             except:
@@ -86,7 +78,10 @@ async def process_backlog():
 
     final_msg = f"🎉 Backfill Complete! Total old requests approved: {count}"
     logger.info(final_msg)
-    await app.send_message(ADMIN_ID, final_msg)
+    try:
+        await app.send_message(ADMIN_ID, final_msg)
+    except:
+        pass
 
 # ---------------------------------------------------------
 # HANDLER: Accept New Incoming Requests (Real-time)
@@ -100,11 +95,9 @@ async def approve_new_request(client, message: ChatJoinRequest):
             user_id=user.id
         )
         
-        # Log to console
         logger.info(f"⚡ Approved: {user.first_name}")
 
         # --- NOTIFY ADMIN ---
-        # Sends a message for every NEW user
         admin_text = (
             f"✅ **New Request Approved**\n"
             f"👤 Name: {user.first_name}\n"
