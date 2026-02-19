@@ -3,7 +3,6 @@ const { Telegraf } = require('telegraf');
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { Api } = require('telegram/tl');
-const input = require('input'); // not used directly, but needed for prompts (we'll override)
 
 // Environment variables
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -140,7 +139,7 @@ bot.on('text', async (ctx) => {
         let chat;
         if (channelInput.startsWith('-100') || /^-?\d+$/.test(channelInput)) {
           // Numeric ID
-          chat = await client.getEntity(new Api.InputPeerChannel({ channelId: BigInt(channelInput), accessHash: 0n }));
+          chat = await client.getEntity(channelInput);
         } else {
           // Username
           chat = await client.getEntity(channelInput);
@@ -188,9 +187,6 @@ async function handleSuccessfulLogin(ctx, state, client) {
   const sessionString = client.session.save();
   state.sessionString = sessionString;
 
-  // Optionally, you could store sessionString in a database for persistence
-  // For now, we keep it in memory.
-
   await ctx.reply('✅ Login successful! Now, please send me the channel ID or username (e.g., @FocketTricks or -1001234567890).');
   state.step = 'awaiting_channel';
 }
@@ -215,9 +211,7 @@ async function startApprovalForUser(userId, ctx) {
       const chat = await client.getEntity(channelId);
       const chatTitle = chat.title || 'Unknown';
 
-      // Use the getChatJoinRequests method (requires appropriate API)
-      // In gramjs, we need to use raw invoke with messages.GetChatInviteImporters
-      // Let's use the correct method: client.getChatJoinRequests(chatId) - this exists.
+      // Use the getChatJoinRequests method
       const requestsIter = client.getChatJoinRequests(channelId, { limit: 100 });
 
       for await (const req of requestsIter) {
@@ -269,10 +263,6 @@ async function startApprovalForUser(userId, ctx) {
 
   // Set up a handler for new join requests (real-time)
   client.addEventHandler(async (update) => {
-    // Check if update is about a new join request for our channel
-    // The update type might be UpdatePendingJoinRequests or UpdateBotChatInviteRequester
-    // We need to inspect the actual update.
-    // For simplicity, we'll handle common types.
     if (update instanceof Api.UpdateBotChatInviteRequester) {
       if (update.peer.channelId && update.peer.channelId.toString() === channelId.toString()) {
         try {
@@ -283,7 +273,6 @@ async function startApprovalForUser(userId, ctx) {
             })
           );
           console.log(`Approved new user ${update.userId}`);
-          // Optionally notify admin
           await ctx.telegram.sendMessage(ADMIN_ID, `✅ New request approved: ${update.userId}`);
         } catch (e) {
           console.error('Error approving new request:', e);
@@ -296,6 +285,9 @@ async function startApprovalForUser(userId, ctx) {
 // Launch bot
 bot.launch().then(() => {
   console.log('Bot started');
+}).catch(err => {
+  console.error('Failed to start bot:', err);
+  process.exit(1);
 });
 
 // Enable graceful stop
