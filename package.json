@@ -1,0 +1,13 @@
+{
+  "name": "telegram-join-approver",
+  "version": "1.0.0",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.15.3",
+    "telegram": "^2.19.12",
+    "dotenv": "^16.3.1"
+  }
+}
